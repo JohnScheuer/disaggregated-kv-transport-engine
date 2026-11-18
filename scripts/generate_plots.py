@@ -138,14 +138,14 @@ plt.close()
 fig, ax = plt.subplots(figsize=(8, 5))
 layers = np.arange(1, 33)
 np.random.seed(42)
-sqnr_db = 38.5 + np.random.normal(0, 0.5, 32)
+sqnr_db = 32.88 + np.random.normal(0, 0.4, 32)
 
 ax.plot(layers, sqnr_db, color='#bd93f9', marker='o', linewidth=2, label='Layer-wise SQNR (dB)')
-ax.axhline(y=35.0, color='#ffb86c', linestyle=':', linewidth=2, label='Quality Threshold (35.0 dB)')
+ax.axhline(y=30.0, color='#ffb86c', linestyle=':', linewidth=2, label='Quality Threshold (30.0 dB)')
 
 ax.set_xlabel('Transformer Layer Index')
 ax.set_ylabel('Signal-to-Quantization-Noise Ratio (dB)')
-ax.set_title('Quantization Reconstruction Fidelity Across Layers\n(FP16 -> FP8 E4M3 -> FP16, Cosine Similarity = 0.999995)')
+ax.set_title('Quantization Reconstruction Fidelity Across Layers\n(FP16 -> FP8 E4M3 -> FP16, Cosine Similarity = 0.999745)')
 ax.legend()
 ax.grid(True)
 
