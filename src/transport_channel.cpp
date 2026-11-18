@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <signal.h>
 
 namespace disagg {
 
@@ -13,7 +14,6 @@ LockFreePinnedRingBuffer::LockFreePinnedRingBuffer(size_t capacity)
     : capacity_(capacity) {
     size_t total_bytes = sizeof(RingSlot) * capacity_;
     
-    // Allocate Host Pinned Zero-Copy memory
     cudaError_t err = cudaHostAlloc(reinterpret_cast<void**>(&slots_host_), total_bytes, cudaHostAllocMapped | cudaHostAllocPortable);
     if (err != cudaSuccess) {
         slots_host_ = reinterpret_cast<RingSlot*>(malloc(total_bytes));
@@ -38,7 +38,7 @@ bool LockFreePinnedRingBuffer::enqueue(const KVBlockDescriptor& desc, const void
     uint32_t expected = static_cast<uint32_t>(RingSlotState::EMPTY);
     if (!slot.state.compare_exchange_strong(expected, static_cast<uint32_t>(RingSlotState::PRODUCING),
                                            std::memory_order_acquire)) {
-        return false; // Ring buffer full
+        return false;
     }
 
     AVX2FramingValidator::frame_packet(slot.header, const_cast<void*>(payload), payload_bytes, desc, sequence_num_++);
@@ -57,7 +57,7 @@ bool LockFreePinnedRingBuffer::dequeue(KVBlockDescriptor& out_desc, void* out_pa
     uint32_t expected = static_cast<uint32_t>(RingSlotState::READY);
     if (!slot.state.compare_exchange_strong(expected, static_cast<uint32_t>(RingSlotState::CONSUMING),
                                            std::memory_order_acquire)) {
-        return false; // Ring buffer empty
+        return false;
     }
 
     if (!AVX2FramingValidator::validate_packet(slot.header, slot.payload)) {
@@ -82,6 +82,7 @@ size_t LockFreePinnedRingBuffer::get_occupancy() const {
 
 SocketTransportChannel::SocketTransportChannel(bool is_server, int port)
     : is_server_(is_server), port_(port) {
+    signal(SIGPIPE, SIG_IGN);
     if (is_server_) {
         setup_server();
     } else {
@@ -90,7 +91,7 @@ SocketTransportChannel::SocketTransportChannel(bool is_server, int port)
 }
 
 SocketTransportChannel::~SocketTransportChannel() {
-    if (conn_fd_ >= 0) close(conn_fd_);
+    if (conn_fd_ >= 0 && conn_fd_ != socket_fd_) close(conn_fd_);
     if (socket_fd_ >= 0) close(socket_fd_);
 }
 
@@ -106,6 +107,10 @@ void SocketTransportChannel::setup_server() {
 
     bind(socket_fd_, (struct sockaddr*)&addr, sizeof(addr));
     listen(socket_fd_, 1);
+
+    sockaddr_in client_addr{};
+    socklen_t client_len = sizeof(client_addr);
+    conn_fd_ = accept(socket_fd_, (struct sockaddr*)&client_addr, &client_len);
 }
 
 void SocketTransportChannel::setup_client() {
@@ -120,15 +125,19 @@ void SocketTransportChannel::setup_client() {
 }
 
 bool SocketTransportChannel::send_block(const KVBlockDescriptor& desc, const void* payload, size_t payload_bytes) {
+    if (conn_fd_ < 0) return false;
     TransportPacketHeader header;
     AVX2FramingValidator::frame_packet(header, const_cast<void*>(payload), payload_bytes, desc, seq_num_++);
 
-    send(conn_fd_, &header, sizeof(header), 0);
-    send(conn_fd_, payload, payload_bytes, 0);
+    ssize_t s1 = send(conn_fd_, &header, sizeof(header), MSG_NOSIGNAL);
+    if (s1 <= 0) return false;
+    ssize_t s2 = send(conn_fd_, payload, payload_bytes, MSG_NOSIGNAL);
+    if (s2 <= 0) return false;
     return true;
 }
 
 bool SocketTransportChannel::receive_block(KVBlockDescriptor& out_desc, void* out_payload, size_t& out_payload_bytes) {
+    if (conn_fd_ < 0) return false;
     TransportPacketHeader header;
     ssize_t r1 = recv(conn_fd_, &header, sizeof(header), MSG_WAITALL);
     if (r1 <= 0) return false;
