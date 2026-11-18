@@ -1,5 +1,4 @@
 build/
 *.csv
-*.png
 .vscode/
 .idea/
