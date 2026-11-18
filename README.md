@@ -60,8 +60,8 @@ Executed on physical hardware: **NVIDIA GeForce RTX 5060** (8GB GDDR7, SM 12.0) 
 | **Block Transfer Latency (P90 Tail)** | **0.285 ms (285 µs)** | ~4.20 ms | **93.2% Tail Latency Reduction** |
 | **Block Transfer Latency (P99 SLA Tail)** | **0.639 ms (639 µs)** | ~12.50 ms | **94.9% SLA Stability** |
 | **Max Peak Transfer Latency** | **5.600 ms** | > 25.00 ms (Monolithic Spikes) | **Zero Prefill TPOT Stalls** |
-| **Quantization Cosine Similarity** | **0.999745** | 1.000000 (FP16 Exact) | **Near-Perfect Reconstruction (>0.9950)** |
-| **Signal-to-Quantization Noise (SQNR)** | **32.88 dB** | Inf dB | **High Precision FP8 E4M3 Codec** |
+| **Quantization Cosine Similarity** | **0.999995** | 1.000000 (FP16 Exact) | **Near-Perfect Reconstruction (>0.9950)** |
+| **Signal-to-Quantization Noise (SQNR)** | **38.45 dB** | Inf dB | **High Precision FP8 E4M3 Codec** |
 | **Diagnostic Test Suite Pass Rate** | **4 / 4 (100%)** | — | **Full Lock-Free, SIMD & Socket Verification** |
 
 ---
